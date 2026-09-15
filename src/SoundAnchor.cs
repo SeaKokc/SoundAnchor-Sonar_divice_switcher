@@ -32,23 +32,6 @@ namespace SoundAnchor
                 return;
             }
 
-            bool portable = Array.Exists(args, delegate(string value) { return string.Equals(value, "--portable", StringComparison.OrdinalIgnoreCase); });
-            if (!portable && !SelfInstaller.IsInstalledLocation())
-            {
-                DialogResult choice = MessageBox.Show(
-                    "Установить SoundAnchor для текущего пользователя?\r\n\r\n" +
-                    "Программа будет добавлена в автозапуск и появится в списке установленных приложений. Права администратора не нужны.\r\n\r\n" +
-                    "«Нет» — запустить портативную версию.",
-                    "Установка SoundAnchor", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
-                if (choice == DialogResult.Cancel) return;
-                if (choice == DialogResult.Yes)
-                {
-                    try { SelfInstaller.Install(); }
-                    catch (Exception ex) { MessageBox.Show("Не удалось установить SoundAnchor.\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-                    return;
-                }
-            }
-
             bool createdNew;
             using (var mutex = new Mutex(true, MutexName, out createdNew))
             {
@@ -1312,28 +1295,6 @@ namespace SoundAnchor
             return string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(InstalledExecutable), StringComparison.OrdinalIgnoreCase);
         }
 
-        public static void Install()
-        {
-            Directory.CreateDirectory(InstallDirectory);
-            File.Copy(Application.ExecutablePath, InstalledExecutable, true);
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SoundAnchor"))
-            {
-                key.SetValue("DisplayName", ProductName, RegistryValueKind.String);
-                key.SetValue("DisplayVersion", Version, RegistryValueKind.String);
-                key.SetValue("Publisher", "SoundAnchor", RegistryValueKind.String);
-                key.SetValue("DisplayIcon", InstalledExecutable, RegistryValueKind.String);
-                key.SetValue("InstallLocation", InstallDirectory, RegistryValueKind.String);
-                key.SetValue("UninstallString", "\"" + InstalledExecutable + "\" --uninstall", RegistryValueKind.String);
-                key.SetValue("NoModify", 1, RegistryValueKind.DWord);
-                key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-                key.SetValue("EstimatedSize", Math.Max(1, (int)(new FileInfo(InstalledExecutable).Length / 1024)), RegistryValueKind.DWord);
-            }
-            using (RegistryKey run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
-                run.SetValue(ProductName, "\"" + InstalledExecutable + "\" --startup", RegistryValueKind.String);
-
-            Process.Start(new ProcessStartInfo(InstalledExecutable, "--installed") { UseShellExecute = true });
-        }
-
         public static void Uninstall()
         {
             if (MessageBox.Show("Удалить SoundAnchor и его настройки?", "Удаление SoundAnchor", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
@@ -1349,8 +1310,16 @@ namespace SoundAnchor
             using (RegistryKey run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
                 if (run != null) run.DeleteValue(ProductName, false);
 
-            string command = "/c timeout /t 2 /nobreak > nul & del /f /q \"" + InstalledExecutable + "\" & rmdir \"" + InstallDirectory + "\"";
+            string startMenuDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), ProductName);
+            string desktopShortcut = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ProductName + ".lnk");
+            try { if (Directory.Exists(startMenuDirectory)) Directory.Delete(startMenuDirectory, true); } catch { }
+            try { if (File.Exists(desktopShortcut)) File.Delete(desktopShortcut); } catch { }
+
+            string uninstaller = Application.ExecutablePath;
+            string installInfo = Path.Combine(InstallDirectory, "install-info.txt");
+            string command = "/c timeout /t 2 /nobreak > nul & del /f /q \"" + InstalledExecutable + "\" & del /f /q \"" + uninstaller + "\" & del /f /q \"" + installInfo + "\" & rmdir \"" + InstallDirectory + "\"";
             Process.Start(new ProcessStartInfo("cmd.exe", command) { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
+            MessageBox.Show("SoundAnchor удалён. Оставшиеся файлы будут очищены автоматически.", "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 }

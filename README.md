@@ -20,7 +20,9 @@ SoundAnchor — компактное Windows-приложение, которо�
 
 ## Установка
 
-Скачайте `SoundAnchor.exe` из последнего релиза. На первом экране можно установить приложение для текущего пользователя или выбрать портативный запуск. После установки выберите нужные устройства и нажмите «Сохранить».
+Скачайте `SoundAnchor-Setup.exe` из последнего релиза и пройдите короткую установку. Установщик добавит SoundAnchor в меню «Пуск», автозапуск и список установленных приложений Windows. Права администратора не требуются.
+
+`SoundAnchor.exe` в релизе — отдельная портативная версия: она запускается без установки и ничего не добавляет в систему.
 
 Текущая стабильная версия — `1.0.0`.
 
@@ -36,6 +38,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 
 ```powershell
 powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File .\tests\SmokeTest.ps1
+```
+
+Для проверки установщика и встроенной в него portable-сборки:
+
+```powershell
+powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File .\tests\SetupSmokeTest.ps1
 ```
 
 Настройки находятся в `HKCU\Software\SoundAnchor`. Автозапуск создаётся в пользовательском разделе `Run`, поэтому UAC и права администратора не требуются.

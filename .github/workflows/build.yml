@@ -12,8 +12,13 @@ jobs:
       - name: Build SoundAnchor
         shell: powershell
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -OutputName SoundAnchor.exe
+      - name: Test installer package
+        shell: powershell
+        run: powershell.exe -STA -NoProfile -ExecutionPolicy Bypass -File .\tests\SetupSmokeTest.ps1
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
           name: SoundAnchor
-          path: dist/SoundAnchor.exe
+          path: |
+            dist/SoundAnchor.exe
+            dist/SoundAnchor-Setup.exe
