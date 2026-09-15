@@ -2,4 +2,3 @@ bin/
 obj/
 *.user
 *.suo
-dist/SoundAnchor.exe

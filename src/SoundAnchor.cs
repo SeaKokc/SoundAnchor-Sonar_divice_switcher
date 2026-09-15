@@ -13,8 +13,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyDescription("Keeps preferred Windows audio devices selected")]
 [assembly: System.Reflection.AssemblyCompany("SoundAnchor")]
 [assembly: System.Reflection.AssemblyProduct("SoundAnchor")]
-[assembly: System.Reflection.AssemblyVersion("0.9.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.9.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
 
 namespace SoundAnchor
 {
@@ -1303,7 +1303,7 @@ namespace SoundAnchor
     internal static class SelfInstaller
     {
         private const string ProductName = "SoundAnchor";
-        private const string Version = "0.9.0-preview";
+        private const string Version = "1.0.0";
         private static string InstallDirectory { get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", ProductName); } }
         private static string InstalledExecutable { get { return Path.Combine(InstallDirectory, ProductName + ".exe"); } }
 

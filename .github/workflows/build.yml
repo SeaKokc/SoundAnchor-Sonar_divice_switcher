@@ -1,4 +1,4 @@
-name: Build preview
+name: Build
 
 on:
   push:
@@ -11,9 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build SoundAnchor
         shell: powershell
-        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -OutputName SoundAnchor-preview.exe
-      - name: Upload preview executable
+        run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -OutputName SoundAnchor.exe
+      - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: SoundAnchor-preview
-          path: dist/SoundAnchor-preview.exe
+          name: SoundAnchor
+          path: dist/SoundAnchor.exe

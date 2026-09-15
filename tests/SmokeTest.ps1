@@ -1,5 +1,5 @@
 param(
-    [string]$AssemblyPath = (Join-Path $PSScriptRoot '..\dist\SoundAnchor-preview.exe'),
+    [string]$AssemblyPath = (Join-Path $PSScriptRoot '..\dist\SoundAnchor.exe'),
     [string]$ScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-preview.png'),
     [string]$FeedbackScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-feedback-preview.png'),
     [string]$DarkScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-dark-preview.png')
