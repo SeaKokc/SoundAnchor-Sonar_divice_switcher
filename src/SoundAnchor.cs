@@ -171,6 +171,13 @@ namespace SoundAnchor
 
                 if (changed) corrections++;
                 UpdateStatus(changed ? "Устройства восстановлены" : "Всё работает · исправлений: " + corrections, true);
+                if (showFailure)
+                {
+                    trayIcon.BalloonTipTitle = "SoundAnchor";
+                    trayIcon.BalloonTipText = changed ? "Выбранные устройства восстановлены." : "Все выбранные устройства уже активны.";
+                    trayIcon.BalloonTipIcon = ToolTipIcon.Info;
+                    trayIcon.ShowBalloonTip(1800);
+                }
             }
             catch (Exception ex)
             {
@@ -418,6 +425,9 @@ namespace SoundAnchor
         private readonly Label outputState;
         private readonly Label inputState;
         private readonly Label overallStatus;
+        private readonly ToastBanner feedback;
+        private readonly System.Windows.Forms.Timer feedbackTimer;
+        private bool lastRefreshSucceeded;
         private bool allowClose;
 
         public event EventHandler<AppConfiguration> SettingsSaved;
@@ -459,14 +469,19 @@ namespace SoundAnchor
             preferences.Controls.Add(startupToggle);
 
             var refresh = new AppleButton { Text = "Обновить устройства", Location = new Point(34, 590), Size = new Size(170, 38), SecondaryStyle = true };
-            refresh.Click += delegate { RefreshDevices(); };
+            refresh.Click += delegate { RefreshDevices(); ShowFeedback(lastRefreshSucceeded ? "Список устройств обновлён" : "Не удалось обновить устройства", lastRefreshSucceeded); };
             var apply = new AppleButton { Text = "Сохранить", Location = new Point(606, 590), Size = new Size(140, 38) };
             apply.Click += SaveClicked;
             AcceptButton = apply;
 
+            feedback = new ToastBanner { Location = new Point(225, 586), Size = new Size(360, 44), Visible = false };
+            feedbackTimer = new System.Windows.Forms.Timer { Interval = 2400 };
+            feedbackTimer.Tick += delegate { feedbackTimer.Stop(); feedback.Visible = false; };
+
             Controls.Add(logo); Controls.Add(title); Controls.Add(subtitle); Controls.Add(overallStatus); Controls.Add(section);
-            Controls.Add(outputCard); Controls.Add(inputCard); Controls.Add(preferences); Controls.Add(refresh); Controls.Add(apply);
+            Controls.Add(outputCard); Controls.Add(inputCard); Controls.Add(preferences); Controls.Add(refresh); Controls.Add(apply); Controls.Add(feedback);
             FormClosing += OnFormClosing;
+            FormClosed += delegate { feedbackTimer.Dispose(); };
         }
 
         private RoundedPanel CreateDeviceCard(bool output, int y, out AppleComboBox combo, out ToggleSwitch toggle, out Label state)
@@ -494,9 +509,11 @@ namespace SoundAnchor
                 SetDeviceState(outputState, outputBox.SelectedItem as DeviceInfo, outputToggle.Checked);
                 SetDeviceState(inputState, inputBox.SelectedItem as DeviceInfo, inputToggle.Checked);
                 SetStatus("●  Защита активна", true);
+                lastRefreshSucceeded = true;
             }
             catch (Exception ex)
             {
+                lastRefreshSucceeded = false;
                 SetStatus("●  Нужна проверка", false);
                 MessageBox.Show("Не удалось обновить аудиоустройства.\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -552,8 +569,17 @@ namespace SoundAnchor
                 EventHandler<AppConfiguration> handler = SettingsSaved;
                 if (handler != null) handler(this, configuration);
                 SetStatus("Настройки сохранены", true);
+                ShowFeedback("Настройки сохранены и применены", true);
             }
-            catch (Exception ex) { MessageBox.Show("Не удалось сохранить настройки.\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex) { ShowFeedback("Не удалось сохранить настройки", false); MessageBox.Show("Не удалось сохранить настройки.\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        }
+
+        private void ShowFeedback(string message, bool success)
+        {
+            feedbackTimer.Stop();
+            feedback.ShowMessage(message, success);
+            feedback.BringToFront();
+            feedbackTimer.Start();
         }
 
         public void AllowCloseAndClose() { allowClose = true; Close(); }
@@ -594,6 +620,26 @@ namespace SoundAnchor
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnMouseLeave(EventArgs e) { pressed = false; Invalidate(); base.OnMouseLeave(e); }
         protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color fill = SecondaryStyle ? (pressed ? Color.FromArgb(238, 238, 242) : Color.White) : (pressed ? Color.FromArgb(0, 94, 190) : Color.FromArgb(0, 113, 227)); Color ink = SecondaryStyle ? Color.FromArgb(0, 102, 204) : Color.White; using (var b = new SolidBrush(fill)) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.FillPath(b, p); if (SecondaryStyle) using (var pen = new Pen(Color.FromArgb(220, 220, 224))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.DrawPath(pen, p); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+    }
+
+    internal sealed class ToastBanner : Control
+    {
+        private string message = "";
+        private bool success;
+        public ToastBanner() { Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); AccessibleRole = AccessibleRole.Alert; }
+        public void ShowMessage(string value, bool isSuccess) { message = value; success = isSuccess; AccessibleName = value; Visible = true; Invalidate(); }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            Color fill = success ? Color.FromArgb(29, 29, 31) : Color.FromArgb(184, 45, 45);
+            using (var brush = new SolidBrush(fill)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 13)) e.Graphics.FillPath(brush, path);
+            using (var pen = new Pen(Color.White, 2f))
+            {
+                if (success) { e.Graphics.DrawLine(pen, 17, 22, 21, 26); e.Graphics.DrawLine(pen, 21, 26, 28, 17); }
+                else { e.Graphics.DrawLine(pen, 19, 17, 27, 25); e.Graphics.DrawLine(pen, 27, 17, 19, 25); }
+            }
+            TextRenderer.DrawText(e.Graphics, message, Font, new Rectangle(40, 0, Width - 52, Height), Color.White, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
     }
 
     internal sealed class AppleComboBox : ComboBox

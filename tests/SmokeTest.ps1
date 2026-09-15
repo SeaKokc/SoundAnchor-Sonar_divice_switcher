@@ -1,6 +1,7 @@
 param(
     [string]$AssemblyPath = (Join-Path $PSScriptRoot '..\dist\SoundAnchor-preview.exe'),
-    [string]$ScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-preview.png')
+    [string]$ScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-preview.png'),
+    [string]$FeedbackScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-feedback-preview.png')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +37,11 @@ try {
             $directory = Split-Path -Parent $ScreenshotPath
             if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
             $bitmap.Save($ScreenshotPath, [Drawing.Imaging.ImageFormat]::Png)
+            $feedbackMethod = $formType.GetMethod('ShowFeedback', [Reflection.BindingFlags]'Instance, NonPublic')
+            $feedbackMethod.Invoke($form, @('Settings saved and applied', $true))
+            [Windows.Forms.Application]::DoEvents()
+            $form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $form.Width, $form.Height))
+            $bitmap.Save($FeedbackScreenshotPath, [Drawing.Imaging.ImageFormat]::Png)
         } finally { $bitmap.Dispose() }
     } finally { $form.Dispose() }
 
@@ -44,6 +50,7 @@ try {
     Write-Output "Default output: $($output.Name)"
     Write-Output "Default input: $($input.Name)"
     Write-Output "Screenshot: $ScreenshotPath"
+    Write-Output "Feedback screenshot: $FeedbackScreenshotPath"
 } finally {
     $serviceType.GetMethod('Dispose').Invoke($service, @()) | Out-Null
 }
