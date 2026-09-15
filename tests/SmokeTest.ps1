@@ -1,7 +1,8 @@
 param(
     [string]$AssemblyPath = (Join-Path $PSScriptRoot '..\dist\SoundAnchor-preview.exe'),
     [string]$ScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-preview.png'),
-    [string]$FeedbackScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-feedback-preview.png')
+    [string]$FeedbackScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-feedback-preview.png'),
+    [string]$DarkScreenshotPath = (Join-Path $PSScriptRoot '..\artifacts\ui-dark-preview.png')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,6 +32,13 @@ try {
         $form.Location = [Drawing.Point]::new(-2000, -2000)
         $form.Show()
         [Windows.Forms.Application]::DoEvents()
+        $flags = [Reflection.BindingFlags]'Instance, NonPublic'
+        $formType.GetField('language', $flags).SetValue($form, 'ru')
+        $formType.GetField('darkMode', $flags).SetValue($form, $false)
+        $formType.GetMethod('ApplyLanguage', $flags).Invoke($form, @())
+        $formType.GetMethod('ApplyTheme', $flags).Invoke($form, @())
+        $titleBar = $formType.GetField('titleBar', $flags).GetValue($form)
+        $titleBar.SetPreferences('ru', $false)
         $bitmap = New-Object Drawing.Bitmap $form.Width, $form.Height
         try {
             $form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $form.Width, $form.Height))
@@ -42,6 +50,15 @@ try {
             [Windows.Forms.Application]::DoEvents()
             $form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $form.Width, $form.Height))
             $bitmap.Save($FeedbackScreenshotPath, [Drawing.Imaging.ImageFormat]::Png)
+            $formType.GetField('language', $flags).SetValue($form, 'en')
+            $formType.GetField('darkMode', $flags).SetValue($form, $true)
+            $formType.GetMethod('ApplyLanguage', $flags).Invoke($form, @())
+            $formType.GetMethod('ApplyTheme', $flags).Invoke($form, @())
+            $titleBar.SetPreferences('en', $true)
+            $feedbackMethod.Invoke($form, @('Theme and language updated', $true))
+            [Windows.Forms.Application]::DoEvents()
+            $form.DrawToBitmap($bitmap, [Drawing.Rectangle]::new(0, 0, $form.Width, $form.Height))
+            $bitmap.Save($DarkScreenshotPath, [Drawing.Imaging.ImageFormat]::Png)
         } finally { $bitmap.Dispose() }
     } finally { $form.Dispose() }
 
@@ -51,6 +68,7 @@ try {
     Write-Output "Default input: $($input.Name)"
     Write-Output "Screenshot: $ScreenshotPath"
     Write-Output "Feedback screenshot: $FeedbackScreenshotPath"
+    Write-Output "Dark screenshot: $DarkScreenshotPath"
 } finally {
     $serviceType.GetMethod('Dispose').Invoke($service, @()) | Out-Null
 }

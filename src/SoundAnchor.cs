@@ -80,20 +80,26 @@ namespace SoundAnchor
         private int corrections;
         private bool paused;
         private bool isExiting;
+        private readonly ToolStripMenuItem openItem;
+        private readonly ToolStripMenuItem checkItem;
+        private readonly ToolStripMenuItem pauseItem;
+        private readonly ToolStripMenuItem exitItem;
 
         public SoundAnchorContext()
         {
             configuration = AppSettings.Load();
 
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Открыть настройки", null, delegate { ShowSettings(); });
-            menu.Items.Add("Проверить сейчас", null, delegate { EnforceNow(true); });
-            var pauseItem = new ToolStripMenuItem("Приостановить защиту");
+            openItem = new ToolStripMenuItem(); openItem.Click += delegate { ShowSettings(); };
+            checkItem = new ToolStripMenuItem(); checkItem.Click += delegate { EnforceNow(true); };
+            pauseItem = new ToolStripMenuItem();
             pauseItem.CheckOnClick = true;
-            pauseItem.CheckedChanged += delegate { paused = pauseItem.Checked; UpdateStatus(paused ? "Защита приостановлена" : "Защита активна", !paused); };
-            menu.Items.Add(pauseItem);
+            pauseItem.CheckedChanged += delegate { paused = pauseItem.Checked; UpdateStatus(paused ? L("Защита приостановлена", "Protection paused") : L("Защита активна", "Protection active"), !paused); };
+            exitItem = new ToolStripMenuItem(); exitItem.Click += delegate { ExitApplication(); };
+            menu.Items.Add(openItem); menu.Items.Add(checkItem); menu.Items.Add(pauseItem);
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("Выход", null, delegate { ExitApplication(); });
+            menu.Items.Add(exitItem);
+            ApplyTrayLanguage();
 
             trayIcon = new NotifyIcon
             {
@@ -121,6 +127,7 @@ namespace SoundAnchor
             {
                 settingsForm = new SettingsForm(audio, configuration);
                 settingsForm.SettingsSaved += OnSettingsSaved;
+                settingsForm.UiLanguageChanged += delegate { ApplyTrayLanguage(); };
                 settingsForm.FormClosed += delegate { settingsForm = null; };
             }
 
@@ -162,19 +169,19 @@ namespace SoundAnchor
 
                 if (missing.Count > 0)
                 {
-                    string waiting = "Ожидание: " + string.Join(", ", missing.ToArray());
+                    string waiting = L("Ожидание: ", "Waiting for ") + string.Join(", ", missing.ToArray());
                     UpdateStatus(waiting, false);
                     if (showFailure)
-                        MessageBox.Show("Некоторые выбранные устройства сейчас не подключены.\r\nSoundAnchor продолжит ждать их в фоне.", "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(L("Некоторые выбранные устройства сейчас не подключены.\r\nSoundAnchor продолжит ждать их в фоне.", "Some selected devices are disconnected.\r\nSoundAnchor will keep waiting in the background."), "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
                 if (changed) corrections++;
-                UpdateStatus(changed ? "Устройства восстановлены" : "Всё работает · исправлений: " + corrections, true);
+                UpdateStatus(changed ? L("Устройства восстановлены", "Devices restored") : L("Всё работает · исправлений: ", "All good · corrections: ") + corrections, true);
                 if (showFailure)
                 {
                     trayIcon.BalloonTipTitle = "SoundAnchor";
-                    trayIcon.BalloonTipText = changed ? "Выбранные устройства восстановлены." : "Все выбранные устройства уже активны.";
+                    trayIcon.BalloonTipText = changed ? L("Выбранные устройства восстановлены.", "Selected devices were restored.") : L("Все выбранные устройства уже активны.", "All selected devices are already active.");
                     trayIcon.BalloonTipIcon = ToolTipIcon.Info;
                     trayIcon.ShowBalloonTip(1800);
                 }
@@ -194,6 +201,16 @@ namespace SoundAnchor
             trayIcon.Text = tooltip.Length > 63 ? tooltip.Substring(0, 63) : tooltip;
             if (settingsForm != null && !settingsForm.IsDisposed)
                 settingsForm.SetStatus(message, healthy);
+        }
+
+        private string L(string russian, string english) { return AppSettings.Language == "ru" ? russian : english; }
+
+        private void ApplyTrayLanguage()
+        {
+            openItem.Text = L("Открыть настройки", "Open settings");
+            checkItem.Text = L("Проверить сейчас", "Check now");
+            pauseItem.Text = L("Приостановить защиту", "Pause protection");
+            exitItem.Text = L("Выход", "Exit");
         }
 
         private void ExitApplication()
@@ -231,6 +248,7 @@ namespace SoundAnchor
         private bool allowClose;
 
         public event EventHandler<AppConfiguration> SettingsSaved;
+        public event EventHandler UiLanguageChanged;
 
         public SettingsForm(AudioDeviceService audio, string selectedDeviceId, string selectedDeviceName)
         {
@@ -428,60 +446,74 @@ namespace SoundAnchor
         private readonly ToastBanner feedback;
         private readonly System.Windows.Forms.Timer feedbackTimer;
         private bool lastRefreshSucceeded;
+        private string language;
+        private bool darkMode;
+        private readonly CustomTitleBar titleBar;
         private bool allowClose;
 
         public event EventHandler<AppConfiguration> SettingsSaved;
+        public event EventHandler UiLanguageChanged;
 
         public SettingsForm(AudioDeviceService audio, AppConfiguration configuration)
         {
             this.audio = audio;
             this.configuration = configuration;
+            language = AppSettings.Language;
+            darkMode = AppSettings.DarkMode;
             Text = "SoundAnchor";
-            ClientSize = new Size(780, 650);
-            MinimumSize = new Size(796, 689);
+            ClientSize = new Size(780, 692);
+            MinimumSize = new Size(780, 692);
+            MaximumSize = new Size(780, 692);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = Canvas;
             Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
             Icon = AppIcon.Create();
             MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.None;
             AutoScaleMode = AutoScaleMode.Dpi;
 
-            var logo = new LogoMark { Location = new Point(34, 29), Size = new Size(48, 48) };
-            var title = MakeLabel("SoundAnchor", 26f, FontStyle.Bold, Ink, 96, 25);
-            var subtitle = MakeLabel("Ваш звук остаётся там, где вы его оставили.", 10.5f, FontStyle.Regular, Secondary, 98, 66);
-            overallStatus = MakeLabel("●  Подготовка", 9.5f, FontStyle.Bold, Color.FromArgb(42, 138, 72), 600, 44);
+            titleBar = new CustomTitleBar(this, language, darkMode) { Location = new Point(0, 0), Size = new Size(780, 44) };
+            titleBar.LanguageChanged += delegate { language = language == "ru" ? "en" : "ru"; AppSettings.SaveUi(language, darkMode); titleBar.SetPreferences(language, darkMode); ApplyLanguage(); EventHandler handler = UiLanguageChanged; if (handler != null) handler(this, EventArgs.Empty); };
+            titleBar.ThemeChanged += delegate { darkMode = !darkMode; AppSettings.SaveUi(language, darkMode); titleBar.SetPreferences(language, darkMode); ApplyTheme(); };
+
+            var logo = new LogoMark { Location = new Point(34, 62), Size = new Size(48, 48) };
+            var title = MakeLabel("SoundAnchor", 26f, FontStyle.Bold, Ink, 96, 58); title.Name = "mainTitle";
+            var subtitle = MakeLabel("Ваш звук остаётся там, где вы его оставили.", 10.5f, FontStyle.Regular, Secondary, 98, 99); subtitle.Name = "subtitle";
+            overallStatus = MakeLabel("●  Подготовка", 9.5f, FontStyle.Bold, Color.FromArgb(42, 138, 72), 600, 77);
             overallStatus.AutoSize = false;
             overallStatus.Size = new Size(145, 28);
             overallStatus.TextAlign = ContentAlignment.MiddleCenter;
             overallStatus.BackColor = Color.FromArgb(229, 246, 234);
 
-            Label section = MakeLabel("ЗАЩИТА УСТРОЙСТВ", 8.5f, FontStyle.Bold, Secondary, 36, 105);
+            Label section = MakeLabel("ЗАЩИТА УСТРОЙСТВ", 8.5f, FontStyle.Bold, Secondary, 36, 138); section.Name = "section";
 
-            RoundedPanel outputCard = CreateDeviceCard(true, 132, out outputBox, out outputToggle, out outputState);
-            RoundedPanel inputCard = CreateDeviceCard(false, 304, out inputBox, out inputToggle, out inputState);
+            RoundedPanel outputCard = CreateDeviceCard(true, 165, out outputBox, out outputToggle, out outputState);
+            RoundedPanel inputCard = CreateDeviceCard(false, 337, out inputBox, out inputToggle, out inputState);
             outputToggle.CheckedChanged += delegate { SetDeviceState(outputState, outputBox.SelectedItem as DeviceInfo, outputToggle.Checked); };
             inputToggle.CheckedChanged += delegate { SetDeviceState(inputState, inputBox.SelectedItem as DeviceInfo, inputToggle.Checked); };
 
-            var preferences = new RoundedPanel { Location = new Point(34, 476), Size = new Size(712, 92), BackColor = Color.White, Radius = 18 };
-            preferences.Controls.Add(MakeLabel("Запускать вместе с Windows", 11f, FontStyle.Bold, Ink, 22, 18));
-            preferences.Controls.Add(MakeLabel("Тихо запускается в трее и ждёт подключения устройств", 9f, FontStyle.Regular, Secondary, 22, 48));
+            var preferences = new RoundedPanel { Location = new Point(34, 509), Size = new Size(712, 92), BackColor = Color.White, Radius = 18 };
+            var startupTitle = MakeLabel("Запускать вместе с Windows", 11f, FontStyle.Bold, Ink, 22, 18); startupTitle.Name = "startupTitle"; preferences.Controls.Add(startupTitle);
+            var startupSubtitle = MakeLabel("Тихо запускается в трее и ждёт подключения устройств", 9f, FontStyle.Regular, Secondary, 22, 48); startupSubtitle.Name = "startupSubtitle"; preferences.Controls.Add(startupSubtitle);
             startupToggle = new ToggleSwitch { Location = new Point(638, 28), Checked = configuration.StartWithWindows };
             preferences.Controls.Add(startupToggle);
 
-            var refresh = new AppleButton { Text = "Обновить устройства", Location = new Point(34, 590), Size = new Size(170, 38), SecondaryStyle = true };
-            refresh.Click += delegate { RefreshDevices(); ShowFeedback(lastRefreshSucceeded ? "Список устройств обновлён" : "Не удалось обновить устройства", lastRefreshSucceeded); };
-            var apply = new AppleButton { Text = "Сохранить", Location = new Point(606, 590), Size = new Size(140, 38) };
+            var refresh = new AppleButton { Name = "refreshButton", Text = "Обновить устройства", Location = new Point(34, 634), Size = new Size(180, 38), SecondaryStyle = true };
+            refresh.Click += delegate { RefreshDevices(); ShowFeedback(lastRefreshSucceeded ? Tr("Список устройств обновлён", "Device list updated") : Tr("Не удалось обновить устройства", "Couldn't update devices"), lastRefreshSucceeded); };
+            var apply = new AppleButton { Name = "saveButton", Text = "Сохранить", Location = new Point(606, 634), Size = new Size(140, 38) };
             apply.Click += SaveClicked;
             AcceptButton = apply;
 
-            feedback = new ToastBanner { Location = new Point(225, 586), Size = new Size(360, 44), Visible = false };
+            feedback = new ToastBanner { Location = new Point(225, 630), Size = new Size(360, 44), Visible = false };
             feedbackTimer = new System.Windows.Forms.Timer { Interval = 2400 };
             feedbackTimer.Tick += delegate { feedbackTimer.Stop(); feedback.Visible = false; };
 
             Controls.Add(logo); Controls.Add(title); Controls.Add(subtitle); Controls.Add(overallStatus); Controls.Add(section);
-            Controls.Add(outputCard); Controls.Add(inputCard); Controls.Add(preferences); Controls.Add(refresh); Controls.Add(apply); Controls.Add(feedback);
+            Controls.Add(outputCard); Controls.Add(inputCard); Controls.Add(preferences); Controls.Add(refresh); Controls.Add(apply); Controls.Add(feedback); Controls.Add(titleBar);
             FormClosing += OnFormClosing;
             FormClosed += delegate { feedbackTimer.Dispose(); };
+            ApplyLanguage();
+            ApplyTheme();
         }
 
         private RoundedPanel CreateDeviceCard(bool output, int y, out AppleComboBox combo, out ToggleSwitch toggle, out Label state)
@@ -489,8 +521,8 @@ namespace SoundAnchor
             var card = new RoundedPanel { Location = new Point(34, y), Size = new Size(712, 152), BackColor = Color.White, Radius = 20 };
             var glyph = new DeviceGlyph { IsMicrophone = !output, Location = new Point(20, 20), Size = new Size(48, 48) };
             card.Controls.Add(glyph);
-            card.Controls.Add(MakeLabel(output ? "Вывод звука" : "Микрофон", 12f, FontStyle.Bold, Ink, 82, 19));
-            card.Controls.Add(MakeLabel(output ? "Наушники, колонки или аудиоинтерфейс" : "Физический или виртуальный вход Sonar", 9f, FontStyle.Regular, Secondary, 82, 47));
+            var cardTitle = MakeLabel(output ? "Вывод звука" : "Микрофон", 12f, FontStyle.Bold, Ink, 82, 19); cardTitle.Name = output ? "outputTitle" : "inputTitle"; card.Controls.Add(cardTitle);
+            var cardSubtitle = MakeLabel(output ? "Наушники, колонки или аудиоинтерфейс" : "Физический или виртуальный вход Sonar", 9f, FontStyle.Regular, Secondary, 82, 47); cardSubtitle.Name = output ? "outputSubtitle" : "inputSubtitle"; card.Controls.Add(cardSubtitle);
             toggle = new ToggleSwitch { Location = new Point(638, 27), Checked = output ? configuration.OutputEnabled : configuration.InputEnabled };
             card.Controls.Add(toggle);
             combo = new AppleComboBox { Location = new Point(22, 91), Size = new Size(518, 32) };
@@ -537,26 +569,26 @@ namespace SoundAnchor
             if (box.SelectedIndex < 0 && box.Items.Count > 0) box.SelectedIndex = 0;
         }
 
-        private static void SetDeviceState(Label label, DeviceInfo device, bool enabled)
+        private void SetDeviceState(Label label, DeviceInfo device, bool enabled)
         {
-            label.Text = !enabled ? "Выключено" : device == null || !device.IsAvailable ? "Не найдено" : "Готово";
+            label.Text = !enabled ? Tr("Выключено", "Off") : device == null || !device.IsAvailable ? Tr("Не найдено", "Unavailable") : Tr("Готово", "Ready");
             label.ForeColor = enabled && device != null && device.IsAvailable ? Color.FromArgb(42, 138, 72) : Secondary;
         }
 
         public void SetStatus(string text, bool healthy)
         {
-            overallStatus.Text = healthy ? "●  Всё работает" : "●  Нужна проверка";
-            overallStatus.ForeColor = healthy ? Color.FromArgb(42, 138, 72) : Color.FromArgb(181, 104, 0);
-            overallStatus.BackColor = healthy ? Color.FromArgb(229, 246, 234) : Color.FromArgb(255, 244, 220);
-            if (!healthy) overallStatus.Text = "●  " + text.Replace("Ожидание: ", "Ожидание ");
+            overallStatus.Text = healthy ? Tr("●  Всё работает", "●  All good") : Tr("●  Нужна проверка", "●  Check needed");
+            overallStatus.ForeColor = healthy ? (darkMode ? Color.FromArgb(92, 214, 124) : Color.FromArgb(42, 138, 72)) : (darkMode ? Color.FromArgb(255, 184, 77) : Color.FromArgb(181, 104, 0));
+            overallStatus.BackColor = healthy ? (darkMode ? Color.FromArgb(32, 67, 43) : Color.FromArgb(229, 246, 234)) : (darkMode ? Color.FromArgb(79, 58, 28) : Color.FromArgb(255, 244, 220));
+            if (!healthy) overallStatus.Text = "●  " + text.Replace("Ожидание: ", Tr("Ожидание ", "Waiting for "));
         }
 
         private void SaveClicked(object sender, EventArgs e)
         {
             DeviceInfo output = outputBox.SelectedItem as DeviceInfo;
             DeviceInfo input = inputBox.SelectedItem as DeviceInfo;
-            if (outputToggle.Checked && output == null) { MessageBox.Show("Выберите устройство вывода.", "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (inputToggle.Checked && input == null) { MessageBox.Show("Выберите микрофон.", "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (outputToggle.Checked && output == null) { MessageBox.Show(Tr("Выберите устройство вывода.", "Select an output device."), "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (inputToggle.Checked && input == null) { MessageBox.Show(Tr("Выберите микрофон.", "Select a microphone."), "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
 
             configuration = new AppConfiguration(
                 output == null ? "" : output.Id, output == null ? "" : output.Name, outputToggle.Checked,
@@ -569,9 +601,9 @@ namespace SoundAnchor
                 EventHandler<AppConfiguration> handler = SettingsSaved;
                 if (handler != null) handler(this, configuration);
                 SetStatus("Настройки сохранены", true);
-                ShowFeedback("Настройки сохранены и применены", true);
+                ShowFeedback(Tr("Настройки сохранены и применены", "Settings saved and applied"), true);
             }
-            catch (Exception ex) { ShowFeedback("Не удалось сохранить настройки", false); MessageBox.Show("Не удалось сохранить настройки.\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            catch (Exception ex) { ShowFeedback(Tr("Не удалось сохранить настройки", "Couldn't save settings"), false); MessageBox.Show(Tr("Не удалось сохранить настройки.", "Couldn't save settings.") + "\r\n\r\n" + ex.Message, "SoundAnchor", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         }
 
         private void ShowFeedback(string message, bool success)
@@ -582,21 +614,179 @@ namespace SoundAnchor
             feedbackTimer.Start();
         }
 
+        private string Tr(string russian, string english) { return language == "ru" ? russian : english; }
+
+        private void ApplyLanguage()
+        {
+            SetText("subtitle", Tr("Ваш звук остаётся там, где вы его оставили.", "Your audio stays exactly where you left it."));
+            SetText("section", Tr("ЗАЩИТА УСТРОЙСТВ", "DEVICE PROTECTION"));
+            SetText("outputTitle", Tr("Вывод звука", "Audio output"));
+            SetText("outputSubtitle", Tr("Наушники, колонки или аудиоинтерфейс", "Headphones, speakers, or an audio interface"));
+            SetText("inputTitle", Tr("Микрофон", "Microphone"));
+            SetText("inputSubtitle", Tr("Физический или виртуальный вход Sonar", "Physical input or a Sonar virtual microphone"));
+            SetText("startupTitle", Tr("Запускать вместе с Windows", "Launch with Windows"));
+            SetText("startupSubtitle", Tr("Тихо запускается в трее и ждёт подключения устройств", "Starts quietly in the tray and waits for your devices"));
+            SetText("refreshButton", Tr("Обновить устройства", "Refresh devices"));
+            SetText("saveButton", Tr("Сохранить", "Save"));
+            SetDeviceState(outputState, outputBox.SelectedItem as DeviceInfo, outputToggle.Checked);
+            SetDeviceState(inputState, inputBox.SelectedItem as DeviceInfo, inputToggle.Checked);
+            SetStatus("", true);
+        }
+
+        private void SetText(string name, string value)
+        {
+            Control[] found = Controls.Find(name, true);
+            if (found.Length > 0) found[0].Text = value;
+        }
+
+        private void ApplyTheme()
+        {
+            Color canvas = darkMode ? Color.FromArgb(24, 24, 26) : Canvas;
+            Color surface = darkMode ? Color.FromArgb(38, 38, 41) : Color.White;
+            Color primary = darkMode ? Color.FromArgb(245, 245, 247) : Ink;
+            Color secondary = darkMode ? Color.FromArgb(166, 166, 173) : Secondary;
+            BackColor = canvas;
+            ApplyThemeTo(Controls, surface, primary, secondary);
+            titleBar.DarkMode = darkMode;
+            SetStatus("", true);
+            Invalidate(true);
+        }
+
+        private void ApplyThemeTo(Control.ControlCollection controls, Color surface, Color primary, Color secondary)
+        {
+            foreach (Control control in controls)
+            {
+                if (control is RoundedPanel) { control.BackColor = surface; ((RoundedPanel)control).BorderColor = darkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(226, 226, 230); }
+                if (control is Label && Convert.ToString(control.Tag) == "primary") control.ForeColor = primary;
+                if (control is Label && Convert.ToString(control.Tag) == "secondary") control.ForeColor = secondary;
+                if (control is AppleComboBox) { control.BackColor = darkMode ? Color.FromArgb(49, 49, 53) : Color.FromArgb(246, 246, 248); control.ForeColor = primary; }
+                if (control is AppleButton) ((AppleButton)control).DarkMode = darkMode;
+                if (control is DeviceGlyph) ((DeviceGlyph)control).DarkMode = darkMode;
+                ApplyThemeTo(control.Controls, surface, primary, secondary);
+            }
+        }
+
         public void AllowCloseAndClose() { allowClose = true; Close(); }
         private void OnFormClosing(object sender, FormClosingEventArgs e) { if (!allowClose && e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } }
 
         private Label MakeLabel(string text, float size, FontStyle style, Color color, int x, int y)
         {
-            return new Label { Text = text, Font = new Font("Segoe UI", size, style), ForeColor = color, BackColor = Color.Transparent, AutoSize = true, Location = new Point(x, y) };
+            return new Label { Text = text, Font = new Font("Segoe UI", size, style), ForeColor = color, BackColor = Color.Transparent, AutoSize = true, Location = new Point(x, y), Tag = color == Ink ? "primary" : color == Secondary ? "secondary" : "status" };
+        }
+
+        protected override CreateParams CreateParams
+        {
+            get { CreateParams parameters = base.CreateParams; parameters.ClassStyle |= 0x00020000; return parameters; }
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            int preference = 2;
+            try { DwmSetWindowAttribute(Handle, 33, ref preference, sizeof(int)); } catch { }
+        }
+
+        [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+    }
+
+    internal sealed class CustomTitleBar : Control
+    {
+        private readonly Form owner;
+        private readonly ChromeButton languageButton;
+        private readonly ChromeButton themeButton;
+        private readonly ChromeButton minimizeButton;
+        private readonly ChromeButton closeButton;
+        private bool darkMode;
+        public event EventHandler LanguageChanged;
+        public event EventHandler ThemeChanged;
+
+        public CustomTitleBar(Form owner, string language, bool dark)
+        {
+            this.owner = owner;
+            SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
+            var caption = new Label { Text = "SoundAnchor", Font = new Font("Segoe UI", 9f, FontStyle.Bold), AutoSize = true, Location = new Point(18, 14), BackColor = Color.Transparent };
+            caption.MouseDown += DragWindow;
+            Controls.Add(caption);
+            languageButton = new ChromeButton { Location = new Point(532, 7), Size = new Size(54, 30) };
+            themeButton = new ChromeButton { Location = new Point(592, 7), Size = new Size(54, 30), IsTheme = true };
+            minimizeButton = new ChromeButton { Text = "—", Location = new Point(674, 7), Size = new Size(42, 30), AccessibleName = "Minimize" };
+            closeButton = new ChromeButton { Text = "×", Location = new Point(722, 7), Size = new Size(42, 30), IsClose = true, AccessibleName = "Close" };
+            languageButton.Click += delegate { EventHandler handler = LanguageChanged; if (handler != null) handler(this, EventArgs.Empty); };
+            themeButton.Click += delegate { EventHandler handler = ThemeChanged; if (handler != null) handler(this, EventArgs.Empty); };
+            minimizeButton.Click += delegate { owner.WindowState = FormWindowState.Minimized; };
+            closeButton.Click += delegate { owner.Close(); };
+            Controls.Add(languageButton); Controls.Add(themeButton); Controls.Add(minimizeButton); Controls.Add(closeButton);
+            MouseDown += DragWindow;
+            SetPreferences(language, dark);
+        }
+
+        public bool DarkMode
+        {
+            get { return darkMode; }
+            set
+            {
+                darkMode = value;
+                BackColor = value ? Color.FromArgb(31, 31, 34) : Color.FromArgb(250, 250, 252);
+                ForeColor = value ? Color.FromArgb(235, 235, 240) : Color.FromArgb(55, 55, 58);
+                foreach (Control control in Controls) { control.ForeColor = ForeColor; if (control is ChromeButton) ((ChromeButton)control).DarkMode = value; }
+                Invalidate(true);
+            }
+        }
+
+        public void SetPreferences(string language, bool dark)
+        {
+            languageButton.Text = language == "ru" ? "RU" : "EN";
+            languageButton.AccessibleName = language == "ru" ? "Switch to English" : "Переключить на русский";
+            themeButton.Text = "";
+            themeButton.ThemeIsDark = dark;
+            themeButton.AccessibleName = dark ? "Light theme" : "Dark theme";
+            DarkMode = dark;
+        }
+
+        private void DragWindow(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Left) return;
+            ReleaseCapture();
+            SendMessage(owner.Handle, 0xA1, new IntPtr(2), IntPtr.Zero);
+        }
+
+        [DllImport("user32.dll")] private static extern bool ReleaseCapture();
+        [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr handle, int message, IntPtr wParam, IntPtr lParam);
+    }
+
+    internal sealed class ChromeButton : Button
+    {
+        private bool hover;
+        public bool DarkMode { get; set; }
+        public bool IsClose { get; set; }
+        public bool IsTheme { get; set; }
+        public bool ThemeIsDark { get; set; }
+        public ChromeButton() { FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Font = new Font("Segoe UI", 9f, FontStyle.Bold); Cursor = Cursors.Hand; TabStop = true; }
+        protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color fill = hover ? (IsClose ? Color.FromArgb(232, 73, 73) : (DarkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(230, 230, 234))) : (DarkMode ? Color.FromArgb(42, 42, 46) : Color.FromArgb(240, 240, 243)); Color ink = hover && IsClose ? Color.White : (DarkMode ? Color.FromArgb(240, 240, 243) : Color.FromArgb(55, 55, 58)); using (var brush = new SolidBrush(fill)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 9)) e.Graphics.FillPath(brush, path); if (IsTheme) DrawThemeIcon(e.Graphics, fill, ink); else TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+        private void DrawThemeIcon(Graphics graphics, Color background, Color ink)
+        {
+            int cx = Width / 2, cy = Height / 2;
+            if (ThemeIsDark)
+            {
+                using (var pen = new Pen(ink, 1.7f)) { graphics.DrawEllipse(pen, cx - 4, cy - 4, 8, 8); for (int i = 0; i < 8; i++) { double angle = i * Math.PI / 4; graphics.DrawLine(pen, cx + (int)(Math.Cos(angle) * 7), cy + (int)(Math.Sin(angle) * 7), cx + (int)(Math.Cos(angle) * 9), cy + (int)(Math.Sin(angle) * 9)); } }
+            }
+            else
+            {
+                using (var brush = new SolidBrush(ink)) graphics.FillEllipse(brush, cx - 6, cy - 7, 13, 13);
+                using (var brush = new SolidBrush(background)) graphics.FillEllipse(brush, cx - 2, cy - 9, 12, 12);
+            }
         }
     }
 
     internal sealed class RoundedPanel : Panel
     {
         public int Radius { get; set; }
-        public RoundedPanel() { Radius = 18; SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true); }
+        public Color BorderColor { get; set; }
+        public RoundedPanel() { Radius = 18; BorderColor = Color.FromArgb(226, 226, 230); SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true); }
         protected override void OnResize(EventArgs e) { base.OnResize(e); using (GraphicsPath path = RoundRect(ClientRectangle, Radius)) Region = new Region(path); }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var pen = new Pen(Color.FromArgb(226, 226, 230))) using (GraphicsPath path = RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), Radius)) e.Graphics.DrawPath(pen, path); base.OnPaint(e); }
+        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var pen = new Pen(BorderColor)) using (GraphicsPath path = RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), Radius)) e.Graphics.DrawPath(pen, path); base.OnPaint(e); }
         internal static GraphicsPath RoundRect(Rectangle r, int radius) { int d = radius * 2; var p = new GraphicsPath(); p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90); p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p; }
     }
 
@@ -614,12 +804,13 @@ namespace SoundAnchor
     internal sealed class AppleButton : Button
     {
         private bool pressed;
+        public bool DarkMode { get; set; }
         public bool SecondaryStyle { get; set; }
         public AppleButton() { FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); Cursor = Cursors.Hand; }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnMouseLeave(EventArgs e) { pressed = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color fill = SecondaryStyle ? (pressed ? Color.FromArgb(238, 238, 242) : Color.White) : (pressed ? Color.FromArgb(0, 94, 190) : Color.FromArgb(0, 113, 227)); Color ink = SecondaryStyle ? Color.FromArgb(0, 102, 204) : Color.White; using (var b = new SolidBrush(fill)) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.FillPath(b, p); if (SecondaryStyle) using (var pen = new Pen(Color.FromArgb(220, 220, 224))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.DrawPath(pen, p); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color secondaryFill = DarkMode ? (pressed ? Color.FromArgb(65, 65, 70) : Color.FromArgb(46, 46, 50)) : (pressed ? Color.FromArgb(238, 238, 242) : Color.White); Color fill = SecondaryStyle ? secondaryFill : (pressed ? Color.FromArgb(0, 94, 190) : Color.FromArgb(0, 113, 227)); Color ink = SecondaryStyle ? (DarkMode ? Color.FromArgb(90, 170, 255) : Color.FromArgb(0, 102, 204)) : Color.White; using (var b = new SolidBrush(fill)) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.FillPath(b, p); if (SecondaryStyle) using (var pen = new Pen(DarkMode ? Color.FromArgb(72, 72, 76) : Color.FromArgb(220, 220, 224))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.DrawPath(pen, p); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
     }
 
     internal sealed class ToastBanner : Control
@@ -655,7 +846,8 @@ namespace SoundAnchor
     internal sealed class DeviceGlyph : Control
     {
         public bool IsMicrophone { get; set; }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(Color.FromArgb(235, 244, 255))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.FromArgb(0, 113, 227), 2.4f)) { if (IsMicrophone) { e.Graphics.DrawArc(pen, 17, 10, 14, 22, 0, 180); e.Graphics.DrawLine(pen, 14, 22, 14, 25); e.Graphics.DrawArc(pen, 14, 16, 20, 18, 0, 180); e.Graphics.DrawLine(pen, 24, 34, 24, 39); e.Graphics.DrawLine(pen, 19, 39, 29, 39); } else { e.Graphics.DrawArc(pen, 12, 12, 24, 25, 190, 160); e.Graphics.DrawLine(pen, 12, 25, 12, 34); e.Graphics.DrawLine(pen, 36, 25, 36, 34); e.Graphics.DrawLine(pen, 12, 34, 17, 34); e.Graphics.DrawLine(pen, 31, 34, 36, 34); } } }
+        public bool DarkMode { get; set; }
+        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(DarkMode ? Color.FromArgb(32, 55, 80) : Color.FromArgb(235, 244, 255))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.FromArgb(35, 140, 255), 2.4f)) { if (IsMicrophone) { e.Graphics.DrawArc(pen, 17, 10, 14, 22, 0, 180); e.Graphics.DrawLine(pen, 14, 22, 14, 25); e.Graphics.DrawArc(pen, 14, 16, 20, 18, 0, 180); e.Graphics.DrawLine(pen, 24, 34, 24, 39); e.Graphics.DrawLine(pen, 19, 39, 29, 39); } else { e.Graphics.DrawArc(pen, 12, 12, 24, 25, 190, 160); e.Graphics.DrawLine(pen, 12, 25, 12, 34); e.Graphics.DrawLine(pen, 36, 25, 36, 34); e.Graphics.DrawLine(pen, 12, 34, 17, 34); e.Graphics.DrawLine(pen, 31, 34, 36, 34); } } }
     }
 
     internal static class AppIcon
@@ -696,6 +888,34 @@ namespace SoundAnchor
 
         public static string SelectedDeviceId { get { return Read("DeviceId"); } }
         public static string SelectedDeviceName { get { return Read("DeviceName"); } }
+        public static string Language
+        {
+            get
+            {
+                string value = Read("Language").ToLowerInvariant();
+                if (value == "ru" || value == "en") return value;
+                return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru" ? "ru" : "en";
+            }
+        }
+        public static bool DarkMode
+        {
+            get
+            {
+                string saved = Read("DarkMode");
+                if (!string.IsNullOrEmpty(saved)) return saved == "1";
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", false))
+                    return key != null && Convert.ToInt32(key.GetValue("AppsUseLightTheme", 1)) == 0;
+            }
+        }
+
+        public static void SaveUi(string language, bool darkMode)
+        {
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(SettingsKey))
+            {
+                key.SetValue("Language", language, RegistryValueKind.String);
+                key.SetValue("DarkMode", darkMode ? 1 : 0, RegistryValueKind.DWord);
+            }
+        }
 
         public static AppConfiguration Load()
         {
