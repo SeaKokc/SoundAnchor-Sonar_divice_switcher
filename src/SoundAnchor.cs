@@ -442,7 +442,7 @@ namespace SoundAnchor
         private readonly ToggleSwitch startupToggle;
         private readonly Label outputState;
         private readonly Label inputState;
-        private readonly Label overallStatus;
+        private readonly StatusPill overallStatus;
         private readonly ToastBanner feedback;
         private readonly System.Windows.Forms.Timer feedbackTimer;
         private bool lastRefreshSucceeded;
@@ -479,11 +479,7 @@ namespace SoundAnchor
             var logo = new LogoMark { Location = new Point(34, 62), Size = new Size(48, 48) };
             var title = MakeLabel("SoundAnchor", 26f, FontStyle.Bold, Ink, 96, 58); title.Name = "mainTitle";
             var subtitle = MakeLabel("Ваш звук остаётся там, где вы его оставили.", 10.5f, FontStyle.Regular, Secondary, 98, 99); subtitle.Name = "subtitle";
-            overallStatus = MakeLabel("●  Подготовка", 9.5f, FontStyle.Bold, Color.FromArgb(42, 138, 72), 600, 77);
-            overallStatus.AutoSize = false;
-            overallStatus.Size = new Size(145, 28);
-            overallStatus.TextAlign = ContentAlignment.MiddleCenter;
-            overallStatus.BackColor = Color.FromArgb(229, 246, 234);
+            overallStatus = new StatusPill { Text = "●  Подготовка", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(42, 138, 72), SurfaceColor = Color.FromArgb(229, 246, 234), Location = new Point(600, 77), Size = new Size(145, 28) };
 
             Label section = MakeLabel("ЗАЩИТА УСТРОЙСТВ", 8.5f, FontStyle.Bold, Secondary, 36, 138); section.Name = "section";
 
@@ -492,7 +488,7 @@ namespace SoundAnchor
             outputToggle.CheckedChanged += delegate { SetDeviceState(outputState, outputBox.SelectedItem as DeviceInfo, outputToggle.Checked); };
             inputToggle.CheckedChanged += delegate { SetDeviceState(inputState, inputBox.SelectedItem as DeviceInfo, inputToggle.Checked); };
 
-            var preferences = new RoundedPanel { Location = new Point(34, 509), Size = new Size(712, 92), BackColor = Color.White, Radius = 18 };
+            var preferences = new RoundedPanel { Location = new Point(34, 509), Size = new Size(712, 92), SurfaceColor = Color.White, Radius = 18 };
             var startupTitle = MakeLabel("Запускать вместе с Windows", 11f, FontStyle.Bold, Ink, 22, 18); startupTitle.Name = "startupTitle"; preferences.Controls.Add(startupTitle);
             var startupSubtitle = MakeLabel("Тихо запускается в трее и ждёт подключения устройств", 9f, FontStyle.Regular, Secondary, 22, 48); startupSubtitle.Name = "startupSubtitle"; preferences.Controls.Add(startupSubtitle);
             startupToggle = new ToggleSwitch { Location = new Point(638, 28), Checked = configuration.StartWithWindows };
@@ -518,7 +514,7 @@ namespace SoundAnchor
 
         private RoundedPanel CreateDeviceCard(bool output, int y, out AppleComboBox combo, out ToggleSwitch toggle, out Label state)
         {
-            var card = new RoundedPanel { Location = new Point(34, y), Size = new Size(712, 152), BackColor = Color.White, Radius = 20 };
+            var card = new RoundedPanel { Location = new Point(34, y), Size = new Size(712, 152), SurfaceColor = Color.White, Radius = 20 };
             var glyph = new DeviceGlyph { IsMicrophone = !output, Location = new Point(20, 20), Size = new Size(48, 48) };
             card.Controls.Add(glyph);
             var cardTitle = MakeLabel(output ? "Вывод звука" : "Микрофон", 12f, FontStyle.Bold, Ink, 82, 19); cardTitle.Name = output ? "outputTitle" : "inputTitle"; card.Controls.Add(cardTitle);
@@ -579,7 +575,7 @@ namespace SoundAnchor
         {
             overallStatus.Text = healthy ? Tr("●  Всё работает", "●  All good") : Tr("●  Нужна проверка", "●  Check needed");
             overallStatus.ForeColor = healthy ? (darkMode ? Color.FromArgb(92, 214, 124) : Color.FromArgb(42, 138, 72)) : (darkMode ? Color.FromArgb(255, 184, 77) : Color.FromArgb(181, 104, 0));
-            overallStatus.BackColor = healthy ? (darkMode ? Color.FromArgb(32, 67, 43) : Color.FromArgb(229, 246, 234)) : (darkMode ? Color.FromArgb(79, 58, 28) : Color.FromArgb(255, 244, 220));
+            overallStatus.SurfaceColor = healthy ? (darkMode ? Color.FromArgb(32, 67, 43) : Color.FromArgb(229, 246, 234)) : (darkMode ? Color.FromArgb(79, 58, 28) : Color.FromArgb(255, 244, 220));
             if (!healthy) overallStatus.Text = "●  " + text.Replace("Ожидание: ", Tr("Ожидание ", "Waiting for "));
         }
 
@@ -656,7 +652,7 @@ namespace SoundAnchor
         {
             foreach (Control control in controls)
             {
-                if (control is RoundedPanel) { control.BackColor = surface; ((RoundedPanel)control).BorderColor = darkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(226, 226, 230); }
+                if (control is RoundedPanel) { RoundedPanel panel = (RoundedPanel)control; panel.SurfaceColor = surface; panel.BorderColor = darkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(226, 226, 230); }
                 if (control is Label && Convert.ToString(control.Tag) == "primary") control.ForeColor = primary;
                 if (control is Label && Convert.ToString(control.Tag) == "secondary") control.ForeColor = secondary;
                 if (control is AppleComboBox) { control.BackColor = darkMode ? Color.FromArgb(49, 49, 53) : Color.FromArgb(246, 246, 248); control.ForeColor = primary; }
@@ -761,10 +757,10 @@ namespace SoundAnchor
         public bool IsClose { get; set; }
         public bool IsTheme { get; set; }
         public bool ThemeIsDark { get; set; }
-        public ChromeButton() { FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Font = new Font("Segoe UI", 9f, FontStyle.Bold); Cursor = Cursors.Hand; TabStop = true; }
+        public ChromeButton() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; UseVisualStyleBackColor = false; FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; FlatAppearance.MouseOverBackColor = Color.Transparent; FlatAppearance.MouseDownBackColor = Color.Transparent; Font = new Font("Segoe UI", 9f, FontStyle.Bold); Cursor = Cursors.Hand; TabStop = true; }
         protected override void OnMouseEnter(EventArgs e) { hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { hover = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color fill = hover ? (IsClose ? Color.FromArgb(232, 73, 73) : (DarkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(230, 230, 234))) : (DarkMode ? Color.FromArgb(42, 42, 46) : Color.FromArgb(240, 240, 243)); Color ink = hover && IsClose ? Color.White : (DarkMode ? Color.FromArgb(240, 240, 243) : Color.FromArgb(55, 55, 58)); using (var brush = new SolidBrush(fill)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 9)) e.Graphics.FillPath(brush, path); if (IsTheme) DrawThemeIcon(e.Graphics, fill, ink); else TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color fill = hover ? (IsClose ? Color.FromArgb(232, 73, 73) : (DarkMode ? Color.FromArgb(58, 58, 62) : Color.FromArgb(230, 230, 234))) : (DarkMode ? Color.FromArgb(42, 42, 46) : Color.FromArgb(240, 240, 243)); Color ink = hover && IsClose ? Color.White : (DarkMode ? Color.FromArgb(240, 240, 243) : Color.FromArgb(55, 55, 58)); using (var brush = new SolidBrush(fill)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 9)) e.Graphics.FillPath(brush, path); if (IsTheme) DrawThemeIcon(e.Graphics, fill, ink); else TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
         private void DrawThemeIcon(Graphics graphics, Color background, Color ink)
         {
             int cx = Width / 2, cy = Height / 2;
@@ -784,8 +780,11 @@ namespace SoundAnchor
     {
         public int Radius { get; set; }
         public Color BorderColor { get; set; }
-        public RoundedPanel() { Radius = 18; BorderColor = Color.FromArgb(226, 226, 230); SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true); }
-        protected override void OnResize(EventArgs e) { base.OnResize(e); using (GraphicsPath path = RoundRect(ClientRectangle, Radius)) Region = new Region(path); }
+        private Color surfaceColor;
+        public Color SurfaceColor { get { return surfaceColor; } set { surfaceColor = value; Invalidate(); } }
+        public RoundedPanel() { Radius = 18; surfaceColor = Color.White; BorderColor = Color.FromArgb(226, 226, 230); SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
+        protected override void OnResize(EventArgs e) { base.OnResize(e); Invalidate(); }
+        protected override void OnPaintBackground(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var brush = new SolidBrush(surfaceColor)) using (GraphicsPath path = RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), Radius)) e.Graphics.FillPath(brush, path); }
         protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var pen = new Pen(BorderColor)) using (GraphicsPath path = RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), Radius)) e.Graphics.DrawPath(pen, path); base.OnPaint(e); }
         internal static GraphicsPath RoundRect(Rectangle r, int radius) { int d = radius * 2; var p = new GraphicsPath(); p.AddArc(r.X, r.Y, d, d, 180, 90); p.AddArc(r.Right - d, r.Y, d, d, 270, 90); p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90); p.AddArc(r.X, r.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p; }
     }
@@ -795,10 +794,10 @@ namespace SoundAnchor
         private bool isChecked;
         public event EventHandler CheckedChanged;
         public bool Checked { get { return isChecked; } set { if (isChecked == value) return; isChecked = value; Invalidate(); EventHandler handler = CheckedChanged; if (handler != null) handler(this, EventArgs.Empty); } }
-        public ToggleSwitch() { Size = new Size(48, 28); Cursor = Cursors.Hand; TabStop = true; AccessibleRole = AccessibleRole.CheckButton; }
+        public ToggleSwitch() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; Size = new Size(48, 28); Cursor = Cursors.Hand; TabStop = true; AccessibleRole = AccessibleRole.CheckButton; }
         protected override void OnClick(EventArgs e) { Checked = !Checked; base.OnClick(e); }
         protected override void OnKeyDown(KeyEventArgs e) { if (e.KeyCode == Keys.Space) { Checked = !Checked; e.Handled = true; } base.OnKeyDown(e); }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(Checked ? Color.FromArgb(52, 199, 89) : Color.FromArgb(210, 210, 214))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 14)) e.Graphics.FillPath(b, p); int x = Checked ? 23 : 3; using (var b = new SolidBrush(Color.White)) e.Graphics.FillEllipse(b, x, 3, 22, 22); }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(Checked ? Color.FromArgb(52, 199, 89) : Color.FromArgb(210, 210, 214))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 14)) e.Graphics.FillPath(b, p); int x = Checked ? 23 : 3; using (var b = new SolidBrush(Color.White)) e.Graphics.FillEllipse(b, x, 3, 22, 22); }
     }
 
     internal sealed class AppleButton : Button
@@ -806,21 +805,22 @@ namespace SoundAnchor
         private bool pressed;
         public bool DarkMode { get; set; }
         public bool SecondaryStyle { get; set; }
-        public AppleButton() { FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); Cursor = Cursors.Hand; }
+        public AppleButton() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; UseVisualStyleBackColor = false; FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0; FlatAppearance.MouseOverBackColor = Color.Transparent; FlatAppearance.MouseDownBackColor = Color.Transparent; Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); Cursor = Cursors.Hand; }
         protected override void OnMouseDown(MouseEventArgs e) { pressed = true; Invalidate(); base.OnMouseDown(e); }
         protected override void OnMouseUp(MouseEventArgs e) { pressed = false; Invalidate(); base.OnMouseUp(e); }
         protected override void OnMouseLeave(EventArgs e) { pressed = false; Invalidate(); base.OnMouseLeave(e); }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color secondaryFill = DarkMode ? (pressed ? Color.FromArgb(65, 65, 70) : Color.FromArgb(46, 46, 50)) : (pressed ? Color.FromArgb(238, 238, 242) : Color.White); Color fill = SecondaryStyle ? secondaryFill : (pressed ? Color.FromArgb(0, 94, 190) : Color.FromArgb(0, 113, 227)); Color ink = SecondaryStyle ? (DarkMode ? Color.FromArgb(90, 170, 255) : Color.FromArgb(0, 102, 204)) : Color.White; using (var b = new SolidBrush(fill)) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.FillPath(b, p); if (SecondaryStyle) using (var pen = new Pen(DarkMode ? Color.FromArgb(72, 72, 76) : Color.FromArgb(220, 220, 224))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.DrawPath(pen, p); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; Color secondaryFill = DarkMode ? (pressed ? Color.FromArgb(65, 65, 70) : Color.FromArgb(46, 46, 50)) : (pressed ? Color.FromArgb(238, 238, 242) : Color.White); Color fill = SecondaryStyle ? secondaryFill : (pressed ? Color.FromArgb(0, 94, 190) : Color.FromArgb(0, 113, 227)); Color ink = SecondaryStyle ? (DarkMode ? Color.FromArgb(90, 170, 255) : Color.FromArgb(0, 102, 204)) : Color.White; using (var b = new SolidBrush(fill)) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.FillPath(b, p); if (SecondaryStyle) using (var pen = new Pen(DarkMode ? Color.FromArgb(72, 72, 76) : Color.FromArgb(220, 220, 224))) using (GraphicsPath p = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 10)) e.Graphics.DrawPath(pen, p); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
     }
 
     internal sealed class ToastBanner : Control
     {
         private string message = "";
         private bool success;
-        public ToastBanner() { Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); AccessibleRole = AccessibleRole.Alert; }
+        public ToastBanner() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); AccessibleRole = AccessibleRole.Alert; }
         public void ShowMessage(string value, bool isSuccess) { message = value; success = isSuccess; AccessibleName = value; Visible = true; Invalidate(); }
         protected override void OnPaint(PaintEventArgs e)
         {
+            base.OnPaintBackground(e);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             Color fill = success ? Color.FromArgb(29, 29, 31) : Color.FromArgb(184, 45, 45);
             using (var brush = new SolidBrush(fill)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), 13)) e.Graphics.FillPath(brush, path);
@@ -833,6 +833,14 @@ namespace SoundAnchor
         }
     }
 
+    internal sealed class StatusPill : Control
+    {
+        private Color surfaceColor = Color.FromArgb(229, 246, 234);
+        public Color SurfaceColor { get { return surfaceColor; } set { surfaceColor = value; Invalidate(); } }
+        public StatusPill() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var brush = new SolidBrush(surfaceColor)) using (GraphicsPath path = RoundedPanel.RoundRect(new Rectangle(0, 0, Width - 1, Height - 1), Height / 2)) e.Graphics.FillPath(brush, path); TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, ForeColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
+    }
+
     internal sealed class AppleComboBox : ComboBox
     {
         public AppleComboBox() { DropDownStyle = ComboBoxStyle.DropDownList; FlatStyle = FlatStyle.Flat; BackColor = Color.FromArgb(246, 246, 248); ForeColor = Color.FromArgb(29, 29, 31); Font = new Font("Segoe UI", 9.5f); }
@@ -840,14 +848,16 @@ namespace SoundAnchor
 
     internal sealed class LogoMark : Control
     {
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(Color.FromArgb(0, 113, 227))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.White, 3)) { e.Graphics.DrawArc(pen, 12, 11, 24, 24, 205, 310); e.Graphics.DrawLine(pen, 24, 12, 24, 27); } }
+        public LogoMark() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(Color.FromArgb(0, 113, 227))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.White, 3)) { e.Graphics.DrawArc(pen, 12, 11, 24, 24, 205, 310); e.Graphics.DrawLine(pen, 24, 12, 24, 27); } }
     }
 
     internal sealed class DeviceGlyph : Control
     {
         public bool IsMicrophone { get; set; }
         public bool DarkMode { get; set; }
-        protected override void OnPaint(PaintEventArgs e) { e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(DarkMode ? Color.FromArgb(32, 55, 80) : Color.FromArgb(235, 244, 255))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.FromArgb(35, 140, 255), 2.4f)) { if (IsMicrophone) { e.Graphics.DrawArc(pen, 17, 10, 14, 22, 0, 180); e.Graphics.DrawLine(pen, 14, 22, 14, 25); e.Graphics.DrawArc(pen, 14, 16, 20, 18, 0, 180); e.Graphics.DrawLine(pen, 24, 34, 24, 39); e.Graphics.DrawLine(pen, 19, 39, 29, 39); } else { e.Graphics.DrawArc(pen, 12, 12, 24, 25, 190, 160); e.Graphics.DrawLine(pen, 12, 25, 12, 34); e.Graphics.DrawLine(pen, 36, 25, 36, 34); e.Graphics.DrawLine(pen, 12, 34, 17, 34); e.Graphics.DrawLine(pen, 31, 34, 36, 34); } } }
+        public DeviceGlyph() { SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true); BackColor = Color.Transparent; }
+        protected override void OnPaint(PaintEventArgs e) { base.OnPaintBackground(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using (var b = new SolidBrush(DarkMode ? Color.FromArgb(32, 55, 80) : Color.FromArgb(235, 244, 255))) e.Graphics.FillEllipse(b, ClientRectangle); using (var pen = new Pen(Color.FromArgb(35, 140, 255), 2.4f)) { if (IsMicrophone) { e.Graphics.DrawArc(pen, 17, 10, 14, 22, 0, 180); e.Graphics.DrawLine(pen, 14, 22, 14, 25); e.Graphics.DrawArc(pen, 14, 16, 20, 18, 0, 180); e.Graphics.DrawLine(pen, 24, 34, 24, 39); e.Graphics.DrawLine(pen, 19, 39, 29, 39); } else { e.Graphics.DrawArc(pen, 12, 12, 24, 25, 190, 160); e.Graphics.DrawLine(pen, 12, 25, 12, 34); e.Graphics.DrawLine(pen, 36, 25, 36, 34); e.Graphics.DrawLine(pen, 12, 34, 17, 34); e.Graphics.DrawLine(pen, 31, 34, 36, 34); } } }
     }
 
     internal static class AppIcon
